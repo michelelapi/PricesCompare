@@ -1,0 +1,6 @@
+I want to create a python application to compare prices, of the same items, among many lists of items.
+# with list of items I mean files excel. Each excel has at least two columns, one for the item name and the other for the price
+# the user has to select the excel files to compare
+# the user has to, each file, select what is the item's column and what is the price's column
+# the application has to compare all the items from the excel files and return a list of the items with the least price
+# the return list has to have displayed on the application and should be a button to save it in a .csv file
