@@ -32,19 +32,19 @@ class PriceCompareApp:
         if files:
             self.files = list(files)
             self.files_label.config(text=f'Selected files: {len(self.files)}')
-            self.file_column_mappings = []  # List of dicts: {file, item_col, price_col}
+            self.file_column_mappings = []  # List of dicts: {file, item_col, price_col, header_idx}
             for file in self.files:
                 try:
-                    df = pd.read_excel(file, nrows=0)
-                    columns = list(df.columns)
-                    item_col, price_col = self.ask_column_mapping(file, columns)
+                    # Pass a dummy columns list, will be ignored
+                    item_col, price_col, header_idx = self.ask_column_mapping_with_header(file)
                     if item_col is None or price_col is None:
                         messagebox.showwarning('Warning', f'Skipping file: {file}')
                         continue
                     self.file_column_mappings.append({
                         'file': file,
                         'item_col': item_col,
-                        'price_col': price_col
+                        'price_col': price_col,
+                        'header_idx': header_idx
                     })
                 except Exception as e:
                     messagebox.showerror('Error', f'Failed to read {file}: {e}')
@@ -60,48 +60,89 @@ class PriceCompareApp:
         else:
             self.files_label.config(text='No files selected.')
 
-    def ask_column_mapping(self, file, columns):
+    def ask_column_mapping_with_header(self, file):
+        import pandas as pd
+        # Read the first 20 rows for preview
+        try:
+            preview_df = pd.read_excel(file, nrows=20, header=None)
+        except Exception as e:
+            messagebox.showerror('Error', f'Failed to preview {file}: {e}')
+            return None, None, None
         dialog = tk.Toplevel(self.root)
-        dialog.title(f'Select columns for {file.split("/")[-1]}')
+        dialog.title(f'Select header row for {file.split("/")[-1]}')
         dialog.grab_set()
-        tk.Label(dialog, text=f'Select columns for file:\n{file}').pack(pady=5)
-        tk.Label(dialog, text='Item column:').pack()
-        item_var = tk.StringVar(dialog)
+        tk.Label(dialog, text=f'Select the header row for file:\n{file}').pack(pady=5)
+        listbox = tk.Listbox(dialog, width=80, height=15)
+        for idx, row in preview_df.iterrows():
+            display = ' | '.join([str(x) for x in row.values])
+            listbox.insert(tk.END, f'Row {idx+1}: {display}')
+        listbox.pack(pady=5)
+        listbox.selection_set(0)
+        header_row_idx = [0]
+        def on_header_select(event=None):
+            sel = listbox.curselection()
+            if sel:
+                header_row_idx[0] = sel[0]
+        listbox.bind('<<ListboxSelect>>', on_header_select)
+        def on_ok_header():
+            dialog.destroy()
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(pady=5)
+        ttk.Button(btn_frame, text='OK', command=on_ok_header).pack(side=tk.LEFT, padx=5)
+        dialog.wait_window()
+        header_idx = header_row_idx[0]
+        columns = [str(x) for x in preview_df.iloc[header_idx].values]
+        # Now show the column selection dialog as before
+        dialog2 = tk.Toplevel(self.root)
+        dialog2.title(f'Select columns for {file.split("/")[-1]}')
+        dialog2.grab_set()
+        tk.Label(dialog2, text=f'Select columns for file:\n{file}').pack(pady=5)
+        tk.Label(dialog2, text='Item column:').pack()
+        item_var = tk.StringVar(dialog2)
         item_var.set(columns[0] if columns else '')
-        item_menu = ttk.Combobox(dialog, textvariable=item_var, values=columns, state='readonly')
+        item_menu = ttk.Combobox(dialog2, textvariable=item_var, values=columns, state='readonly')
         item_menu.pack(pady=2)
-        tk.Label(dialog, text='Price column:').pack()
-        price_var = tk.StringVar(dialog)
+        tk.Label(dialog2, text='Price column:').pack()
+        price_var = tk.StringVar(dialog2)
         price_var.set(columns[1] if len(columns) > 1 else (columns[0] if columns else ''))
-        price_menu = ttk.Combobox(dialog, textvariable=price_var, values=columns, state='readonly')
+        price_menu = ttk.Combobox(dialog2, textvariable=price_var, values=columns, state='readonly')
         price_menu.pack(pady=2)
         result = {'item': None, 'price': None}
         def on_ok():
             result['item'] = item_var.get()
             result['price'] = price_var.get()
-            dialog.destroy()
+            dialog2.destroy()
         def on_cancel():
-            dialog.destroy()
-        btn_frame = ttk.Frame(dialog)
-        btn_frame.pack(pady=5)
-        ttk.Button(btn_frame, text='OK', command=on_ok).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text='Cancel', command=on_cancel).pack(side=tk.LEFT, padx=5)
-        dialog.wait_window()
-        return result['item'], result['price']
+            dialog2.destroy()
+        btn_frame2 = ttk.Frame(dialog2)
+        btn_frame2.pack(pady=5)
+        ttk.Button(btn_frame2, text='OK', command=on_ok).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text='Cancel', command=on_cancel).pack(side=tk.LEFT, padx=5)
+        dialog2.wait_window()
+        return result['item'], result['price'], header_idx
 
     def compare_and_display(self):
         # Read all items and prices
         all_items = []  # List of dicts: {item, price, file, original_item}
         for mapping in self.file_column_mappings:
             try:
-                df = pd.read_excel(mapping['file'], usecols=[mapping['item_col'], mapping['price_col']])
+                df = pd.read_excel(
+                    mapping['file'],
+                    usecols=[mapping['item_col'], mapping['price_col']],
+                    header=mapping['header_idx']
+                )
                 for _, row in df.iterrows():
                     original_item = str(row[mapping['item_col']])
                     item_key = original_item.strip().lower()
-                    try:
-                        price = float(row[mapping['price_col']])
-                    except Exception:
-                        continue  # skip rows with invalid price
+                    price_cell = row[mapping['price_col']]
+                    # If price is missing or empty, treat as zero
+                    if pd.isna(price_cell) or str(price_cell).strip() == '':
+                        price = 0.0
+                    else:
+                        try:
+                            price = float(price_cell)
+                        except Exception:
+                            price = 0.0
                     all_items.append({'item_key': item_key, 'price': price, 'file': mapping['file'], 'original_item': original_item})
             except Exception as e:
                 messagebox.showerror('Error', f'Failed to process {mapping['file']}: {e}')
