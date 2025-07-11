@@ -145,7 +145,7 @@ class PriceCompareApp:
                             price = 0.0
                     all_items.append({'item_key': item_key, 'price': price, 'file': mapping['file'], 'original_item': original_item})
             except Exception as e:
-                messagebox.showerror('Error', f'Failed to process {mapping['file']}: {e}')
+                messagebox.showerror('Error', f'Failed to process {mapping["file"]}: {e}')
         # Find lowest price for each item (case-insensitive, stripped)
         best_prices = {}
         for entry in all_items:
