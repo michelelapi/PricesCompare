@@ -75,13 +75,21 @@ class PriceCompareApp:
         tk.Label(dialog, text=f'Select the header row for file:\n{file}').pack(pady=5)
         # Use Treeview for table-like display
         columns = [f"Col {i+1}" for i in range(preview_df.shape[1])]
+        style = ttk.Style()
+        style.configure('HeaderTreeview.Heading', background='#d9ead3', foreground='black', font=('Arial', 10, 'bold'))
+        style.map('HeaderTreeview.Heading', background=[('active', '#b6d7a8')])
+        style.configure('header_evenrow', background='#f2f2f2')
+        style.configure('header_oddrow', background='#ffffff')
         tree = ttk.Treeview(dialog, columns=columns, show='headings', height=15)
         for i, col in enumerate(columns):
             tree.heading(col, text=col)
             tree.column(col, width=100, anchor='center')
         for idx, row in preview_df.iterrows():
             values = [str(x) if not pd.isna(x) else "" for x in row.values]
-            tree.insert('', 'end', iid=idx, values=values)
+            tag = 'header_evenrow' if idx % 2 == 0 else 'header_oddrow'
+            tree.insert('', 'end', iid=idx, values=values, tags=(tag,))
+        tree.tag_configure('header_evenrow', background='#f2f2f2')
+        tree.tag_configure('header_oddrow', background='#ffffff')
         tree.pack(pady=5)
         # Select first row by default
         tree.selection_set(tree.get_children()[0])
@@ -202,18 +210,26 @@ class PriceCompareApp:
         self.result_frame = ttk.Frame(self.root)
         self.result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         columns = ['Item', 'Description', 'Lowest Price', 'Quantity', 'Source File']
+        style = ttk.Style()
+        style.configure('Treeview.Heading', background='#d9ead3', foreground='black', font=('Arial', 10, 'bold'))
+        style.map('Treeview.Heading', background=[('active', '#b6d7a8')])
+        style.configure('evenrow', background='#f2f2f2')
+        style.configure('oddrow', background='#ffffff')
         self.result_tree = ttk.Treeview(self.result_frame, columns=columns, show='headings', height=15)
         for col in columns:
             self.result_tree.heading(col, text=col)
             self.result_tree.column(col, width=150, anchor='center', stretch=True)
-        for r in results_sorted:
+        for idx, r in enumerate(results_sorted):
+            tag = 'evenrow' if idx % 2 == 0 else 'oddrow'
             self.result_tree.insert('', 'end', values=[
                 r['item'],
                 r['description'],
                 r['price'],
                 '',  # Quantity column is empty
                 r['file'].split('/')[-1]
-            ])
+            ], tags=(tag,))
+        self.result_tree.tag_configure('evenrow', background='#f2f2f2')
+        self.result_tree.tag_configure('oddrow', background='#ffffff')
         # Add scrollbars
         self.tree_scroll_y = ttk.Scrollbar(self.result_frame, orient='vertical', command=self.result_tree.yview)
         self.tree_scroll_x = ttk.Scrollbar(self.result_frame, orient='horizontal', command=self.result_tree.xview)
