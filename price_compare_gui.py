@@ -1,15 +1,41 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import pandas as pd
+import json
+import os
+
+CONFIG_FILE = 'config.json'
 
 class PriceCompareApp:
     def __init__(self, root):
         self.root = root
         self.root.title('Price Compare Application')
         self.files = []
+        self.config = self.load_config()
         self.setup_ui()
 
+    def load_config(self):
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {'csv_separator': ','}
+
+    def save_config(self):
+        try:
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=2)
+        except Exception as e:
+            messagebox.showerror('Error', f'Failed to save config: {e}')
+
     def setup_ui(self):
+        top_frame = ttk.Frame(self.root)
+        top_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Config button at top right
+        self.config_btn = ttk.Button(top_frame, text='Config', command=self.open_config_dialog)
+        self.config_btn.pack(side=tk.RIGHT)
         frame = ttk.Frame(self.root, padding=10)
         frame.pack(fill=tk.BOTH, expand=True)
 
@@ -241,7 +267,6 @@ class PriceCompareApp:
         self.result_frame.columnconfigure(0, weight=1)
 
     def save_results(self):
-        import os
         import csv
         from tkinter import filedialog
         if not hasattr(self, 'comparison_results') or not self.comparison_results:
@@ -259,19 +284,39 @@ class PriceCompareApp:
                 results_by_file[source_file] = []
             results_by_file[source_file].append(r)
         # Save one CSV per source Excel file
+        sep = self.config.get('csv_separator', ',')
         for source_file, rows in results_by_file.items():
             base_name = os.path.splitext(os.path.basename(source_file))[0]
             csv_name = f"{base_name}_compared.csv"
             csv_path = os.path.join(folder_path, csv_name)
             try:
                 with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.writer(f)
+                    writer = csv.writer(f, delimiter=sep)
                     writer.writerow(['Item', 'Description', 'Lowest Price', 'Quantity'])
                     for r in rows:
                         writer.writerow([r['item'], r['description'], r['price'], ''])
             except Exception as e:
                 messagebox.showerror('Error', f'Failed to save CSV for {source_file}: {e}')
         messagebox.showinfo('Success', f'CSV files saved to {folder_path}')
+
+    def open_config_dialog(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title('Configuration')
+        dialog.grab_set()
+        tk.Label(dialog, text='CSV Column Separator:').pack(pady=5)
+        sep_var = tk.StringVar(dialog)
+        sep_var.set(self.config.get('csv_separator', ','))
+        sep_entry = ttk.Entry(dialog, textvariable=sep_var, width=5)
+        sep_entry.pack(pady=5)
+        def on_save():
+            self.config['csv_separator'] = sep_var.get()
+            self.save_config()
+            dialog.destroy()
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(pady=5)
+        ttk.Button(btn_frame, text='Save', command=on_save).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text='Cancel', command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+        dialog.wait_window()
 
 if __name__ == '__main__':
     root = tk.Tk()
