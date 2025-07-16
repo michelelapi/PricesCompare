@@ -1,3 +1,5 @@
 {
-  "csv_separator": ";"
+  "csv_separator": ";",
+  "decimal_separator": ".",
+  "thousands_separator": ","
 }

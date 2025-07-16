@@ -21,7 +21,7 @@ class PriceCompareApp:
                     return json.load(f)
             except Exception:
                 pass
-        return {'csv_separator': ','}
+        return {'csv_separator': ',', 'decimal_separator': '.', 'thousands_separator': ','}
 
     def save_config(self):
         try:
@@ -171,6 +171,8 @@ class PriceCompareApp:
     def compare_and_display(self):
         # Read all items and prices
         all_items = []  # List of dicts: {item, price, file, original_item}
+        dec_sep = self.config.get('decimal_separator', '.')
+        thou_sep = self.config.get('thousands_separator', ',')
         for mapping in self.file_column_mappings:
             try:
                 df = pd.read_excel(
@@ -188,7 +190,13 @@ class PriceCompareApp:
                         price = 0.0
                     else:
                         try:
-                            price = float(price_cell)
+                            price_str = str(price_cell).strip()
+                            # Only remove thousands separator if different from decimal separator
+                            if thou_sep and thou_sep != dec_sep:
+                                price_str = price_str.replace(thou_sep, '')
+                            if dec_sep and dec_sep != '.':
+                                price_str = price_str.replace(dec_sep, '.')
+                            price = float(price_str)
                         except Exception:
                             price = 0.0
                     all_items.append({'item_key': item_key, 'price': price, 'file': mapping['file'], 'original_item': original_item, 'description': description_cell})
@@ -308,8 +316,20 @@ class PriceCompareApp:
         sep_var.set(self.config.get('csv_separator', ','))
         sep_entry = ttk.Entry(dialog, textvariable=sep_var, width=5)
         sep_entry.pack(pady=5)
+        tk.Label(dialog, text='Decimal Separator:').pack(pady=5)
+        dec_var = tk.StringVar(dialog)
+        dec_var.set(self.config.get('decimal_separator', '.'))
+        dec_entry = ttk.Entry(dialog, textvariable=dec_var, width=5)
+        dec_entry.pack(pady=5)
+        tk.Label(dialog, text='Thousands Separator:').pack(pady=5)
+        thou_var = tk.StringVar(dialog)
+        thou_var.set(self.config.get('thousands_separator', ','))
+        thou_entry = ttk.Entry(dialog, textvariable=thou_var, width=5)
+        thou_entry.pack(pady=5)
         def on_save():
             self.config['csv_separator'] = sep_var.get()
+            self.config['decimal_separator'] = dec_var.get()
+            self.config['thousands_separator'] = thou_var.get()
             self.save_config()
             dialog.destroy()
         btn_frame = ttk.Frame(dialog)
