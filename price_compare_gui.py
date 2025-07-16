@@ -215,6 +215,8 @@ class PriceCompareApp:
             self.tree_scroll_y.destroy()
         if hasattr(self, 'result_frame') and self.result_frame:
             self.result_frame.destroy()
+        if hasattr(self, 'search_frame') and self.search_frame:
+            self.search_frame.destroy()
         # If no results, show a message
         if not results:
             self.result_box.config(state=tk.NORMAL)
@@ -227,9 +229,8 @@ class PriceCompareApp:
         self.result_box.delete(1.0, tk.END)
         self.result_box.config(state=tk.DISABLED)
         self.result_box.pack_forget()
-        # Sort results by description
-        # results_sorted = sorted(results, key=lambda r: str(r['description']).lower() if r['description'] is not None else '')
-        results_sorted = results
+        # Store all results for searching
+        self._all_results = results
         # Create a frame to hold the Treeview and scrollbars
         self.result_frame = ttk.Frame(self.root)
         self.result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -243,15 +244,7 @@ class PriceCompareApp:
         for col in columns:
             self.result_tree.heading(col, text=col)
             self.result_tree.column(col, width=150, anchor='center', stretch=True)
-        for idx, r in enumerate(results_sorted):
-            tag = 'evenrow' if idx % 2 == 0 else 'oddrow'
-            self.result_tree.insert('', 'end', values=[
-                r['item'],
-                r['description'],
-                r['price'],
-                '',  # Quantity column is empty
-                r['file'].split('/')[-1]
-            ], tags=(tag,))
+        self._populate_result_tree(results)
         self.result_tree.tag_configure('evenrow', background='#f2f2f2')
         self.result_tree.tag_configure('oddrow', background='#ffffff')
         # Add scrollbars
@@ -263,25 +256,103 @@ class PriceCompareApp:
         self.tree_scroll_x.grid(row=1, column=0, sticky='ew')
         self.result_frame.rowconfigure(0, weight=1)
         self.result_frame.columnconfigure(0, weight=1)
+        # Make cells editable on double-click
+        def on_double_click(event):
+            region = self.result_tree.identify('region', event.x, event.y)
+            if region != 'cell':
+                return
+            row_id = self.result_tree.identify_row(event.y)
+            col_id = self.result_tree.identify_column(event.x)
+            if not row_id or not col_id:
+                return
+            col_idx = int(col_id.replace('#', '')) - 1
+            x, y, width, height = self.result_tree.bbox(row_id, col_id)
+            value = self.result_tree.set(row_id, columns[col_idx])
+            entry = tk.Entry(self.result_tree)
+            entry.place(x=x, y=y, width=width, height=height)
+            entry.insert(0, value)
+            entry.focus()
+            def save_edit(event=None):
+                self.result_tree.set(row_id, columns[col_idx], entry.get())
+                entry.destroy()
+            entry.bind('<Return>', save_edit)
+            entry.bind('<FocusOut>', save_edit)
+        self.result_tree.bind('<Double-1>', on_double_click)
+        # Add search input and dropdown below the table
+        self.search_frame = ttk.Frame(self.root)
+        self.search_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        ttk.Label(self.search_frame, text='Search:').pack(side=tk.LEFT)
+        self.search_var = tk.StringVar()
+        self.search_entry = ttk.Entry(self.search_frame, textvariable=self.search_var, width=30)
+        self.search_entry.pack(side=tk.LEFT, padx=5)
+        self.search_column_var = tk.StringVar()
+        self.search_column_var.set('Description')
+        self.search_column_menu = ttk.Combobox(self.search_frame, textvariable=self.search_column_var, values=['Description', 'Item'], state='readonly', width=12)
+        self.search_column_menu.pack(side=tk.LEFT, padx=5)
+        def on_search(*args):
+            term = self.search_var.get().lower()
+            col = self.search_column_var.get().lower()
+            # Instead of filtering, just select the first matching row
+            for row_id in self.result_tree.get_children():
+                values = self.result_tree.item(row_id)['values']
+                if col == 'description':
+                    cell = str(values[1]).lower()
+                else:
+                    cell = str(values[0]).lower()
+                if term in cell:
+                    self.result_tree.selection_set(row_id)
+                    self.result_tree.see(row_id)
+                    break
+            else:
+                self.result_tree.selection_remove(self.result_tree.selection())
+        self.search_var.trace_add('write', lambda *args: on_search())
+        self.search_column_var.trace_add('write', lambda *args: on_search())
+
+    def _populate_result_tree(self, results):
+        # Helper to clear and repopulate the result_tree
+        for row in self.result_tree.get_children():
+            self.result_tree.delete(row)
+        for idx, r in enumerate(results):
+            tag = 'evenrow' if idx % 2 == 0 else 'oddrow'
+            self.result_tree.insert('', 'end', values=[
+                r['item'],
+                r['description'],
+                r['price'],
+                r.get('quantity', ''),
+                r['file'].split('/')[-1] if 'file' in r else ''
+            ], tags=(tag,))
 
     def save_results(self):
         import csv
         from tkinter import filedialog
-        if not hasattr(self, 'comparison_results') or not self.comparison_results:
+        if not hasattr(self, 'result_tree') or not self.result_tree.get_children():
             messagebox.showwarning('Warning', 'No results to save.')
             return
         # Let user select destination folder
         folder_path = filedialog.askdirectory(title='Select destination folder for CSV files')
         if not folder_path:
             return
+        # Gather current data from the Treeview
+        tree_data = []
+        for row_id in self.result_tree.get_children():
+            values = self.result_tree.item(row_id)['values']
+            # Ensure we have all columns (Item, Description, Lowest Price, Quantity, Source File)
+            if len(values) < 5:
+                values += [''] * (5 - len(values))
+            tree_data.append({
+                'item': values[0],
+                'description': values[1],
+                'price': values[2],
+                'quantity': values[3],
+                'file': values[4],
+            })
         # Group results by source file
         results_by_file = {}
-        for r in self.comparison_results:
+        for r in tree_data:
             source_file = r['file']
             if source_file not in results_by_file:
                 results_by_file[source_file] = []
             results_by_file[source_file].append(r)
-        # Save one CSV per source Excel file
         sep = self.config.get('csv_separator', ',')
         dec_sep = self.config.get('decimal_separator', '.')
         thou_sep = self.config.get('thousands_separator', ',')
@@ -291,15 +362,18 @@ class PriceCompareApp:
             with open(combined_csv_path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f, delimiter=sep)
                 writer.writerow(['Item', 'Description', 'Lowest Price', 'Quantity', 'Source File'])
-                for r in self.comparison_results:
+                for r in tree_data:
                     price = r['price']
-                    if isinstance(price, float):
-                        price_str = f"{price:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
-                    else:
+                    # Format price with config separators if it's a number
+                    try:
+                        price_float = float(str(price).replace(thou_sep, '').replace(dec_sep, '.'))
+                        price_str = f"{price_float:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
+                    except Exception:
                         price_str = str(price)
-                    writer.writerow([r['item'], r['description'], price_str, '', r['file'].split('/')[-1]])
+                    writer.writerow([r['item'], r['description'], price_str, r['quantity'], r['file']])
         except Exception as e:
             messagebox.showerror('Error', f'Failed to save combined CSV: {e}')
+        # Save one CSV per source Excel file
         for source_file, rows in results_by_file.items():
             base_name = os.path.splitext(os.path.basename(source_file))[0]
             csv_name = f"{base_name}_compared.csv"
@@ -310,11 +384,12 @@ class PriceCompareApp:
                     writer.writerow(['Item', 'Description', 'Lowest Price', 'Quantity'])
                     for r in rows:
                         price = r['price']
-                        if isinstance(price, float):
-                            price_str = f"{price:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
-                        else:
+                        try:
+                            price_float = float(str(price).replace(thou_sep, '').replace(dec_sep, '.'))
+                            price_str = f"{price_float:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
+                        except Exception:
                             price_str = str(price)
-                        writer.writerow([r['item'], r['description'], price_str, ''])
+                        writer.writerow([r['item'], r['description'], price_str, r['quantity']])
             except Exception as e:
                 messagebox.showerror('Error', f'Failed to save CSV for {source_file}: {e}')
         messagebox.showinfo('Success', f'CSV files saved to {folder_path}')
