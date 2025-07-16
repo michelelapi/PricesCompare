@@ -171,8 +171,6 @@ class PriceCompareApp:
     def compare_and_display(self):
         # Read all items and prices
         all_items = []  # List of dicts: {item, price, file, original_item}
-        dec_sep = self.config.get('decimal_separator', '.')
-        thou_sep = self.config.get('thousands_separator', ',')
         for mapping in self.file_column_mappings:
             try:
                 df = pd.read_excel(
@@ -189,16 +187,7 @@ class PriceCompareApp:
                     if pd.isna(price_cell) or str(price_cell).strip() == '':
                         price = 0.0
                     else:
-                        try:
-                            price_str = str(price_cell).strip()
-                            # Only remove thousands separator if different from decimal separator
-                            if thou_sep and thou_sep != dec_sep:
-                                price_str = price_str.replace(thou_sep, '')
-                            if dec_sep and dec_sep != '.':
-                                price_str = price_str.replace(dec_sep, '.')
-                            price = float(price_str)
-                        except Exception:
-                            price = 0.0
+                        price = price_cell
                     all_items.append({'item_key': item_key, 'price': price, 'file': mapping['file'], 'original_item': original_item, 'description': description_cell})
             except Exception as e:
                 messagebox.showerror('Error', f'Failed to process {mapping["file"]}: {e}')
@@ -293,6 +282,8 @@ class PriceCompareApp:
             results_by_file[source_file].append(r)
         # Save one CSV per source Excel file
         sep = self.config.get('csv_separator', ',')
+        dec_sep = self.config.get('decimal_separator', '.')
+        thou_sep = self.config.get('thousands_separator', ',')
         for source_file, rows in results_by_file.items():
             base_name = os.path.splitext(os.path.basename(source_file))[0]
             csv_name = f"{base_name}_compared.csv"
@@ -302,7 +293,14 @@ class PriceCompareApp:
                     writer = csv.writer(f, delimiter=sep)
                     writer.writerow(['Item', 'Description', 'Lowest Price', 'Quantity'])
                     for r in rows:
-                        writer.writerow([r['item'], r['description'], r['price'], ''])
+                        # Format price with config separators
+                        price = r['price']
+                        if isinstance(price, float):
+                            # Format with 4 decimals, then replace separators
+                            price_str = f"{price:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
+                        else:
+                            price_str = str(price)
+                        writer.writerow([r['item'], r['description'], price_str, ''])
             except Exception as e:
                 messagebox.showerror('Error', f'Failed to save CSV for {source_file}: {e}')
         messagebox.showinfo('Success', f'CSV files saved to {folder_path}')
