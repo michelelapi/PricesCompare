@@ -199,7 +199,7 @@ class PriceCompareApp:
                 best_prices[item_key] = {'price': entry['price'], 'file': entry['file'], 'original_item': entry['original_item'], 'description': entry['description']}
         # Prepare results for display
         results = []
-        for item_key, data in sorted(best_prices.items()):
+        for item_key, data in sorted(best_prices.items(), key=lambda x: str(x[1]['description']).lower()):
             results.append({'item': data['original_item'], 'price': data['price'], 'description': data['description'], 'file': data['file']})
         self.display_results(results)
         self.comparison_results = results  # Save for CSV export
@@ -228,7 +228,8 @@ class PriceCompareApp:
         self.result_box.config(state=tk.DISABLED)
         self.result_box.pack_forget()
         # Sort results by description
-        results_sorted = sorted(results, key=lambda r: str(r['description']).lower() if r['description'] is not None else '')
+        # results_sorted = sorted(results, key=lambda r: str(r['description']).lower() if r['description'] is not None else '')
+        results_sorted = results
         # Create a frame to hold the Treeview and scrollbars
         self.result_frame = ttk.Frame(self.root)
         self.result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -284,6 +285,21 @@ class PriceCompareApp:
         sep = self.config.get('csv_separator', ',')
         dec_sep = self.config.get('decimal_separator', '.')
         thou_sep = self.config.get('thousands_separator', ',')
+        # Save combined CSV as well
+        combined_csv_path = os.path.join(folder_path, 'result_compared.csv')
+        try:
+            with open(combined_csv_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f, delimiter=sep)
+                writer.writerow(['Item', 'Description', 'Lowest Price', 'Quantity', 'Source File'])
+                for r in self.comparison_results:
+                    price = r['price']
+                    if isinstance(price, float):
+                        price_str = f"{price:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
+                    else:
+                        price_str = str(price)
+                    writer.writerow([r['item'], r['description'], price_str, '', r['file'].split('/')[-1]])
+        except Exception as e:
+            messagebox.showerror('Error', f'Failed to save combined CSV: {e}')
         for source_file, rows in results_by_file.items():
             base_name = os.path.splitext(os.path.basename(source_file))[0]
             csv_name = f"{base_name}_compared.csv"
@@ -293,10 +309,8 @@ class PriceCompareApp:
                     writer = csv.writer(f, delimiter=sep)
                     writer.writerow(['Item', 'Description', 'Lowest Price', 'Quantity'])
                     for r in rows:
-                        # Format price with config separators
                         price = r['price']
                         if isinstance(price, float):
-                            # Format with 4 decimals, then replace separators
                             price_str = f"{price:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
                         else:
                             price_str = str(price)
