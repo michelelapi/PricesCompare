@@ -9,7 +9,7 @@ CONFIG_FILE = 'config.json'
 class PriceCompareApp:
     def __init__(self, root):
         self.root = root
-        self.root.title('Price Compare Application')
+        self.root.title('Confronta prezzi')
         self.files = []
         self.config = self.load_config()
         self.setup_ui()
@@ -28,7 +28,7 @@ class PriceCompareApp:
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=2)
         except Exception as e:
-            messagebox.showerror('Error', f'Failed to save config: {e}')
+            messagebox.showerror('Error', f'Impossibile salvare la configurazione: {e}')
 
     def setup_ui(self):
         # Create a menu bar
@@ -37,30 +37,30 @@ class PriceCompareApp:
         # File menu
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label='File', menu=file_menu)
-        file_menu.add_command(label='Save Results as CSV', command=self.save_results, state='disabled')
-        file_menu.add_command(label='Save Temporary Results', command=self.save_temporary_results, state='disabled')
-        file_menu.add_command(label='Load Results From CSV', command=self.load_results_from_csv)
+        file_menu.add_command(label='Salva risultati come CSV', command=self.save_results, state='disabled')
+        file_menu.add_command(label='Salva risultati temporanei', command=self.save_temporary_results, state='disabled')
+        file_menu.add_command(label='Carica risultati da CSV', command=self.load_results_from_csv)
         file_menu.add_separator()
-        file_menu.add_command(label='Exit', command=self.root.quit)
+        file_menu.add_command(label='Esci', command=self.root.quit)
         # Config menu
         config_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label='Config', menu=config_menu)
-        config_menu.add_command(label='Settings', command=self.open_config_dialog)
+        menubar.add_cascade(label='Configurazione', menu=config_menu)
+        config_menu.add_command(label='Impostazioni', command=self.open_config_dialog)
         # Store menu items for enabling/disabling
-        self.menu_save_results = file_menu.entryconfig('Save Results as CSV', state='disabled')
-        self.menu_save_temp = file_menu.entryconfig('Save Temporary Results', state='disabled')
+        self.menu_save_results = file_menu.entryconfig('Salva risultati come CSV', state='disabled')
+        self.menu_save_temp = file_menu.entryconfig('Salva risultati temporanei', state='disabled')
         frame = ttk.Frame(self.root, padding=10)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        self.select_btn = ttk.Button(frame, text='Select Excel Files', command=self.select_files)
+        self.select_btn = ttk.Button(frame, text='Segli i listini da confrontare', command=self.select_files)
         self.select_btn.pack(pady=5)
 
-        self.files_label = ttk.Label(frame, text='No files selected.')
+        self.files_label = ttk.Label(frame, text='Nessun listino selezionato.')
         self.files_label.pack(pady=5)
 
         self.result_box = tk.Text(frame, height=15, width=60)
         self.result_box.pack(pady=5)
-        self.result_box.insert(tk.END, 'Results will appear here.')
+        self.result_box.insert(tk.END, 'I risultati appariranno qui.')
         self.result_box.config(state=tk.DISABLED)
         # Remove button placements for save_btn, save_temp_btn, load_btn, config_btn
         # self.save_btn = ttk.Button(frame, text='Save Results as CSV', command=self.save_results, state=tk.DISABLED)
@@ -75,14 +75,14 @@ class PriceCompareApp:
         files = filedialog.askopenfilenames(filetypes=[('Excel Files', '*.xlsx;*.xls')])
         if files:
             self.files = list(files)
-            self.files_label.config(text=f'Selected files: {len(self.files)}')
+            self.files_label.config(text=f'File selezionati: {len(self.files)}')
             self.file_column_mappings = []  # List of dicts: {file, item_col, price_col, header_idx}
             for file in self.files:
                 try:
                     # Pass a dummy columns list, will be ignored
                     item_col, price_col, description_col, header_idx = self.ask_column_mapping_with_header(file)
                     if item_col is None or price_col is None or description_col is None:
-                        messagebox.showwarning('Warning', f'Skipping file: {file}')
+                        messagebox.showwarning('Warning', f'Salto file: {file}')
                         continue
                     self.file_column_mappings.append({
                         'file': file,
@@ -92,23 +92,23 @@ class PriceCompareApp:
                         'header_idx': header_idx
                     })
                 except Exception as e:
-                    messagebox.showerror('Error', f'Failed to read {file}: {e}')
+                    messagebox.showerror('Error', f'Impossibile leggere {file}: {e}')
             # Placeholder: Next, process files and compare prices
             if self.file_column_mappings:
                 self.compare_and_display()
             else:
                 self.result_box.config(state=tk.NORMAL)
                 self.result_box.delete(1.0, tk.END)
-                self.result_box.insert(tk.END, 'No valid files/columns selected.')
+                self.result_box.insert(tk.END, 'Nessun file/colonna valido selezionato.')
                 self.result_box.config(state=tk.DISABLED)
                 # Disable menu items for saving if no results
-                self.file_menu.entryconfig('Save Results as CSV', state='disabled')
-                self.file_menu.entryconfig('Save Temporary Results', state='disabled')
+                self.file_menu.entryconfig('Salva risultati come CSV', state='disabled')
+                self.file_menu.entryconfig('Salva risultati temporanei', state='disabled')
         else:
-            self.files_label.config(text='No files selected.')
+            self.files_label.config(text='Nessun file selezionato.')
             # Disable menu items for saving if no files
-            self.file_menu.entryconfig('Save Results as CSV', state='disabled')
-            self.file_menu.entryconfig('Save Temporary Results', state='disabled')
+            self.file_menu.entryconfig('Salva risultati come CSV', state='disabled')
+            self.file_menu.entryconfig('Salva risultati temporanei', state='disabled')
 
     def ask_column_mapping_with_header(self, file):
         import pandas as pd
@@ -116,12 +116,12 @@ class PriceCompareApp:
         try:
             preview_df = pd.read_excel(file, nrows=20, header=None)
         except Exception as e:
-            messagebox.showerror('Error', f'Failed to preview {file}: {e}')
+            messagebox.showerror('Error', f'Impossibile visualizzare {file}: {e}')
             return None, None, None, None
         dialog = tk.Toplevel(self.root)
-        dialog.title(f'Select header row for {file.split("/")[-1]}')
+        dialog.title(f'Seleziona la riga di intestazione per {file.split("/")[-1]}')
         dialog.grab_set()
-        tk.Label(dialog, text=f'Select the header row for file:\n{file}').pack(pady=5)
+        tk.Label(dialog, text=f'Seleziona la riga di intestazione per il file:\n{file}').pack(pady=5)
         # Use Treeview for table-like display
         columns = [f"Col {i+1}" for i in range(preview_df.shape[1])]
         style = ttk.Style()
@@ -158,20 +158,20 @@ class PriceCompareApp:
         columns = [str(x) for x in preview_df.iloc[header_idx].values]
         # Now show the column selection dialog as before
         dialog2 = tk.Toplevel(self.root)
-        dialog2.title(f'Select columns for {file.split("/")[-1]}')
+        dialog2.title(f'Seleziona le colonne per {file.split("/")[-1]}')
         dialog2.grab_set()
-        tk.Label(dialog2, text=f'Select columns for file:\n{file}').pack(pady=5)
-        tk.Label(dialog2, text='Item column:').pack()
+        tk.Label(dialog2, text=f'Seleziona le colonne per il file:\n{file}').pack(pady=5)
+        tk.Label(dialog2, text='Codice articolo/EAN:').pack()
         item_var = tk.StringVar(dialog2)
         item_var.set(columns[0] if columns else '')
         item_menu = ttk.Combobox(dialog2, textvariable=item_var, values=columns, state='readonly')
         item_menu.pack(pady=2)
-        tk.Label(dialog2, text='Price column:').pack()
+        tk.Label(dialog2, text='Prezzo:').pack()
         price_var = tk.StringVar(dialog2)
         price_var.set(columns[0] if columns else '')
         price_menu = ttk.Combobox(dialog2, textvariable=price_var, values=columns, state='readonly')
         price_menu.pack(pady=2)
-        tk.Label(dialog2, text='Description column:').pack()
+        tk.Label(dialog2, text='Descrizione:').pack()
         description_var = tk.StringVar(dialog2)
         description_var.set(columns[0] if columns else '')
         description_menu = ttk.Combobox(dialog2, textvariable=description_var, values=columns, state='readonly')
@@ -213,7 +213,7 @@ class PriceCompareApp:
                         price = price_cell
                     all_items.append({'item_key': item_key, 'price': price, 'file': mapping['file'], 'original_item': original_item, 'description': description_cell})
             except Exception as e:
-                messagebox.showerror('Error', f'Failed to process {mapping["file"]}: {e}')
+                messagebox.showerror('Error', f'Impossibile processare {mapping["file"]}: {e}')
         # Find lowest price for each item (case-insensitive, stripped)
         best_prices = {}
         for entry in all_items:
@@ -229,9 +229,9 @@ class PriceCompareApp:
         # Enable menu items for saving if results exist
         if hasattr(self, 'root') and hasattr(self, 'menu_save_results') and hasattr(self, 'menu_save_temp'):
             state = 'normal' if results else 'disabled'
-            self.root.nametowidget('menu').entryconfig('File', state='normal')
-            self.file_menu.entryconfig('Save Results as CSV', state=state)
-            self.file_menu.entryconfig('Save Temporary Results', state=state)
+            # Enable menu items for saving
+            self.file_menu.entryconfig('Salva risultati come CSV', state=state)
+            self.file_menu.entryconfig('Salva risultati temporanei', state=state)
 
     def display_results(self, results):
         """
@@ -256,7 +256,7 @@ class PriceCompareApp:
         if not results:
             self.result_box.config(state=tk.NORMAL)
             self.result_box.delete(1.0, tk.END)
-            self.result_box.insert(tk.END, 'No results to display.')
+            self.result_box.insert(tk.END, 'Nessun risultato da visualizzare.')
             self.result_box.config(state=tk.DISABLED)
             return
         # Hide the text box
@@ -310,13 +310,16 @@ class PriceCompareApp:
             def save_edit(event=None):
                 self.result_tree.set(row_id, columns[col_idx], entry.get())
                 entry.destroy()
+                # If the edited column is 'Quantity', update the total
+                if columns[col_idx] == 'Quantity':
+                    self._update_total_label()
             entry.bind('<Return>', save_edit)
             entry.bind('<FocusOut>', save_edit)
         self.result_tree.bind('<Double-1>', on_double_click)
         # Add search input and dropdown below the table
         self.search_frame = ttk.Frame(self.root)
         self.search_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
-        ttk.Label(self.search_frame, text='Search:').pack(side=tk.LEFT)
+        ttk.Label(self.search_frame, text='Cerca:').pack(side=tk.LEFT)
         self.search_var = tk.StringVar()
         self.search_entry = ttk.Entry(self.search_frame, textvariable=self.search_var, width=30)
         self.search_entry.pack(side=tk.LEFT, padx=5)
@@ -343,6 +346,12 @@ class PriceCompareApp:
         self.search_var.trace_add('write', lambda *args: on_search())
         self.search_column_var.trace_add('write', lambda *args: on_search())
 
+        # Add total label below the search frame
+        self.total_var = tk.StringVar()
+        self.total_label = ttk.Label(self.root, textvariable=self.total_var, font=('Arial', 12, 'bold'))
+        self.total_label.pack(pady=(0, 10))
+        self._update_total_label()
+
     def _populate_result_tree(self, results):
         # Helper to clear and repopulate the result_tree
         for row in self.result_tree.get_children():
@@ -361,10 +370,10 @@ class PriceCompareApp:
         import csv
         from tkinter import filedialog
         if not hasattr(self, 'result_tree') or not self.result_tree.get_children():
-            messagebox.showwarning('Warning', 'No results to save.')
+            messagebox.showwarning('Warning', 'Nessun risultato da salvare.')
             return
         # Let user select destination folder
-        folder_path = filedialog.askdirectory(title='Select destination folder for CSV files')
+        folder_path = filedialog.askdirectory(title='Seleziona la cartella di destinazione per i file CSV')
         if not folder_path:
             return
         sep = self.config.get('csv_separator', ',')
@@ -377,17 +386,17 @@ class PriceCompareApp:
             # Ensure we have all columns (Item, Description, Lowest Price, Quantity, Source File)
             if len(values) < 5:
                 values += [''] * (5 - len(values))
-            # Format price according to config
-            price = values[2]
-            try:
-                price_float = float(str(price).replace(thou_sep, '').replace(dec_sep, '.'))
-                price_str = f"{price_float:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
-            except Exception:
-                price_str = str(price)
+            # # Format price according to config
+            # price = values[2]
+            # try:
+            #     price_float = float(str(price).replace(thou_sep, '').replace(dec_sep, '.'))
+            #     price_str = f"{price_float:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
+            # except Exception:
+            #     price_str = str(price)
             tree_data.append({
                 'item': values[0],
                 'description': values[1],
-                'price': price_str,
+                'price': values[2],
                 'quantity': values[3],
                 'file': values[4],
             })
@@ -406,8 +415,8 @@ class PriceCompareApp:
                     if str(r['quantity']).strip() and str(r['quantity']).strip() != '0':
                         price = r['price']
                         try:
-                            price_float = float(str(price).replace(thou_sep, '').replace(dec_sep, '.'))
-                            price_str = f"{price_float:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
+                            # price_float = float(str(price).replace(thou_sep, '').replace(dec_sep, '.'))
+                            price_str = f"{price}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
                         except Exception:
                             price_str = str(price)
                         writer.writerow([r['item'], r['description'], price_str, r['quantity'], r['file']])
@@ -426,8 +435,8 @@ class PriceCompareApp:
                         if str(r['quantity']).strip() and str(r['quantity']).strip() != '0':
                             price = r['price']
                             try:
-                                price_float = float(str(price).replace(thou_sep, '').replace(dec_sep, '.'))
-                                price_str = f"{price_float:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
+                                # price_float = float(str(price).replace(thou_sep, '').replace(dec_sep, '.'))
+                                price_str = f"{price}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
                             except Exception:
                                 price_str = str(price)
                             writer.writerow([r['item'], r['description'], price_str, r['quantity']])
@@ -439,9 +448,9 @@ class PriceCompareApp:
         import csv
         from tkinter import filedialog
         if not hasattr(self, 'result_tree') or not self.result_tree.get_children():
-            messagebox.showwarning('Warning', 'No results to save.')
+            messagebox.showwarning('Warning', 'Nessun risultato da salvare.')
             return
-        file_path = filedialog.asksaveasfilename(defaultextension='.csv', filetypes=[('CSV Files', '*.csv')], title='Save Temporary Results As')
+        file_path = filedialog.asksaveasfilename(defaultextension='.csv', filetypes=[('CSV Files', '*.csv')], title='Salva i risultati temporanei come')
         if not file_path:
             return
         sep = self.config.get('csv_separator', ',')
@@ -457,8 +466,8 @@ class PriceCompareApp:
             # Format price according to config
             price = values[2]
             try:
-                price_float = float(str(price).replace(thou_sep, '').replace(dec_sep, '.'))
-                price_str = f"{price_float:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
+                # price_float = float(str(price).replace(thou_sep, '').replace(dec_sep, '.'))
+                price_str = f"{price}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
             except Exception:
                 price_str = str(price)
             tree_data.append({
@@ -481,7 +490,7 @@ class PriceCompareApp:
     def load_results_from_csv(self):
         import pandas as pd
         from tkinter import filedialog
-        file_path = filedialog.askopenfilename(filetypes=[('CSV Files', '*.csv')], title='Load Results From CSV')
+        file_path = filedialog.askopenfilename(filetypes=[('CSV Files', '*.csv')], title='Carica i risultati da CSV')
         if not file_path:
             return
         sep = self.config.get('csv_separator', ',')
@@ -496,8 +505,8 @@ class PriceCompareApp:
                     if pd.isna(val) or str(val).strip() == '':
                         return ''
                     try:
-                        price_float = float(str(val).replace(thou_sep, '').replace(dec_sep, '.'))
-                        return f"{price_float:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
+                        return  float(str(val).replace(thou_sep, '').replace(dec_sep, '.'))
+                        # return f"{price_float:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
                     except Exception:
                         return str(val)
                 df['Lowest Price'] = df['Lowest Price'].apply(format_price)
@@ -515,28 +524,28 @@ class PriceCompareApp:
                 self.display_results(df.to_dict('records'))
                 messagebox.showinfo('Success', f'Results loaded from {file_path}')
                 # Enable menu items for saving
-                self.file_menu.entryconfig('Save Results as CSV', state='normal')
-                self.file_menu.entryconfig('Save Temporary Results', state='normal')
+                self.file_menu.entryconfig('Salva risultati come CSV', state='normal')
+                self.file_menu.entryconfig('Salva risultati temporanei', state='normal')
             else:
                 messagebox.showwarning('Warning', 'CSV file does not contain expected columns (Item, Description, Lowest Price).')
         except Exception as e:
-            messagebox.showerror('Error', f'Failed to load results from CSV: {e}')
+            messagebox.showerror('Error', f'Impossibile caricare i risultati da CSV: {e}')
 
     def open_config_dialog(self):
         dialog = tk.Toplevel(self.root)
-        dialog.title('Configuration')
+        dialog.title('Configurazione')
         dialog.grab_set()
-        tk.Label(dialog, text='CSV Column Separator:').pack(pady=5)
+        tk.Label(dialog, text='Separatore colonne CSV:').pack(pady=5)
         sep_var = tk.StringVar(dialog)
         sep_var.set(self.config.get('csv_separator', ','))
         sep_entry = ttk.Entry(dialog, textvariable=sep_var, width=5)
         sep_entry.pack(pady=5)
-        tk.Label(dialog, text='Decimal Separator:').pack(pady=5)
+        tk.Label(dialog, text='Separatore decimali:').pack(pady=5)
         dec_var = tk.StringVar(dialog)
         dec_var.set(self.config.get('decimal_separator', '.'))
         dec_entry = ttk.Entry(dialog, textvariable=dec_var, width=5)
         dec_entry.pack(pady=5)
-        tk.Label(dialog, text='Thousands Separator:').pack(pady=5)
+        tk.Label(dialog, text='Separatore migliaia:').pack(pady=5)
         thou_var = tk.StringVar(dialog)
         thou_var.set(self.config.get('thousands_separator', ','))
         thou_entry = ttk.Entry(dialog, textvariable=thou_var, width=5)
@@ -549,9 +558,22 @@ class PriceCompareApp:
             dialog.destroy()
         btn_frame = ttk.Frame(dialog)
         btn_frame.pack(pady=5)
-        ttk.Button(btn_frame, text='Save', command=on_save).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text='Cancel', command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text='Salva', command=on_save).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text='Annulla', command=dialog.destroy).pack(side=tk.LEFT, padx=5)
         dialog.wait_window()
+
+    def _update_total_label(self):
+        # Calculate the total (prezzo*quantità) for all rows
+        total = 0.0
+        for row_id in self.result_tree.get_children():
+            values = self.result_tree.item(row_id)['values']
+            try:
+                prezzo = float(str(values[2]).replace(',', '.').replace(' ', ''))
+                quantita = float(str(values[3]).replace(',', '.').replace(' ', '')) if str(values[3]).strip() else 0.0
+                total += prezzo * quantita
+            except Exception:
+                continue
+        self.total_var.set(f"Totale: {total:,.2f}")
 
 if __name__ == '__main__':
     root = tk.Tk()
