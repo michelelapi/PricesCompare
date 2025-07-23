@@ -563,17 +563,24 @@ class PriceCompareApp:
         dialog.wait_window()
 
     def _update_total_label(self):
-        # Calculate the total (prezzo*quantità) for all rows
-        total = 0.0
+        # Calculate the total (prezzo*quantità) grouped by listino (source file)
+        totals = {}
         for row_id in self.result_tree.get_children():
             values = self.result_tree.item(row_id)['values']
             try:
                 prezzo = float(str(values[2]).replace(',', '.').replace(' ', ''))
                 quantita = float(str(values[3]).replace(',', '.').replace(' ', '')) if str(values[3]).strip() else 0.0
-                total += prezzo * quantita
+                listino = str(values[4]) if len(values) > 4 else 'Listino sconosciuto'
+                if listino not in totals:
+                    totals[listino] = 0.0
+                totals[listino] += prezzo * quantita
             except Exception:
                 continue
-        self.total_var.set(f"Totale: {total:,.2f}")
+        if totals:
+            lines = [f"Totale per {listino}: {tot:,.2f}" for listino, tot in totals.items()]
+            self.total_var.set("\n".join(lines))
+        else:
+            self.total_var.set("")
 
 if __name__ == '__main__':
     root = tk.Tk()
