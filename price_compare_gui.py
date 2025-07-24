@@ -202,8 +202,22 @@ class PriceCompareApp:
                     header=mapping['header_idx']
                 )
                 for _, row in df.iterrows():
-                    original_item = str(row[mapping['item_col']])
-                    item_key = original_item.strip().lower()
+                    # Try to treat item as a number if possible
+                    item_cell = row[mapping['item_col']]
+                    if pd.isna(item_cell):
+                        original_item = ''
+                        item_key = ''
+                    else:
+                        try:
+                            # Try integer first, then float
+                            if float(item_cell).is_integer():
+                                original_item = int(item_cell)
+                            else:
+                                original_item = float(item_cell)
+                            item_key = str(original_item)
+                        except Exception:
+                            original_item = str(item_cell)
+                            item_key = original_item.strip().lower()
                     price_cell = row[mapping['price_col']]
                     description_cell = row[mapping['description_col']]
                     # If price is missing or empty, treat as zero
