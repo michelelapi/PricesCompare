@@ -52,8 +52,23 @@ class PriceCompareApp:
         frame = ttk.Frame(self.root, padding=10)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        self.select_btn = ttk.Button(frame, text='Segli i listini da confrontare', command=self.select_files)
-        self.select_btn.pack(pady=5)
+        # --- Button row for file selection ---
+        btn_row = ttk.Frame(frame)
+        btn_row.pack(pady=5)
+
+        self.select_btn = ttk.Button(btn_row, text='Scegli i listini da confrontare', command=self.select_files)
+        self.select_btn.pack(side=tk.LEFT, padx=2)
+
+        # Remove the add_btn (Aggiungi listino)
+        # self.add_btn = ttk.Button(btn_row, text='Aggiungi listino', command=self.add_file)
+        # self.add_btn.pack(side=tk.LEFT, padx=2)
+
+        self.clear_btn = ttk.Button(btn_row, text='Svuota lista', command=self.clear_files)
+        self.clear_btn.pack(side=tk.LEFT, padx=2)
+
+        # Remove old placement of select_btn
+        # self.select_btn = ttk.Button(frame, text='Scegli i listini da confrontare', command=self.select_files)
+        # self.select_btn.pack(pady=5)
 
         self.files_label = ttk.Label(frame, text='Nessun listino selezionato.')
         self.files_label.pack(pady=5)
@@ -74,12 +89,21 @@ class PriceCompareApp:
     def select_files(self):
         files = filedialog.askopenfilenames(filetypes=[('Excel Files', '*.xlsx;*.xls')])
         if files:
-            self.files = list(files)
+            # Only add files not already in the list
+            new_files = [f for f in files if f not in self.files]
+            duplicate_files = [f for f in files if f in self.files]
+            if duplicate_files:
+                messagebox.showinfo('Info', 'Listino già selezionato')
+            if not new_files:
+                # If all selected files are duplicates, just update label and return
+                self.files_label.config(text=f'File selezionati: {len(self.files)}')
+                return
+            self.files.extend(new_files)
             self.files_label.config(text=f'File selezionati: {len(self.files)}')
-            self.file_column_mappings = []  # List of dicts: {file, item_col, price_col, header_idx}
-            for file in self.files:
+            if not hasattr(self, 'file_column_mappings') or not isinstance(self.file_column_mappings, list):
+                self.file_column_mappings = []
+            for file in new_files:
                 try:
-                    # Pass a dummy columns list, will be ignored
                     item_col, price_col, description_col, header_idx = self.ask_column_mapping_with_header(file)
                     if item_col is None or price_col is None or description_col is None:
                         messagebox.showwarning('Warning', f'Salto file: {file}')
@@ -93,7 +117,6 @@ class PriceCompareApp:
                     })
                 except Exception as e:
                     messagebox.showerror('Error', f'Impossibile leggere {file}: {e}')
-            # Placeholder: Next, process files and compare prices
             if self.file_column_mappings:
                 self.compare_and_display()
             else:
@@ -101,14 +124,39 @@ class PriceCompareApp:
                 self.result_box.delete(1.0, tk.END)
                 self.result_box.insert(tk.END, 'Nessun file/colonna valido selezionato.')
                 self.result_box.config(state=tk.DISABLED)
-                # Disable menu items for saving if no results
                 self.file_menu.entryconfig('Salva risultati come CSV', state='disabled')
                 self.file_menu.entryconfig('Salva risultati temporanei', state='disabled')
         else:
-            self.files_label.config(text='Nessun file selezionato.')
-            # Disable menu items for saving if no files
-            self.file_menu.entryconfig('Salva risultati come CSV', state='disabled')
-            self.file_menu.entryconfig('Salva risultati temporanei', state='disabled')
+            self.files_label.config(text=f'File selezionati: {len(self.files)}')
+
+    # Remove add_file method
+
+    def clear_files(self):
+        self.files = []
+        self.file_column_mappings = []
+        self.files_label.config(text='Nessun listino selezionato.')
+        # Remove result widgets if any
+        if hasattr(self, 'result_tree') and self.result_tree:
+            self.result_tree.destroy()
+        if hasattr(self, 'tree_scroll_x') and self.tree_scroll_x:
+            self.tree_scroll_x.destroy()
+        if hasattr(self, 'tree_scroll_y') and self.tree_scroll_y:
+            self.tree_scroll_y.destroy()
+        if hasattr(self, 'result_frame') and self.result_frame:
+            self.result_frame.destroy()
+        if hasattr(self, 'search_frame') and self.search_frame:
+            self.search_frame.destroy()
+        if hasattr(self, 'total_label') and self.total_label:
+            self.total_var.set("")
+            self.total_label.pack_forget()
+        self.result_box.config(state=tk.NORMAL)
+        self.result_box.delete(1.0, tk.END)
+        self.result_box.insert(tk.END, 'I risultati appariranno qui.')
+        self.result_box.config(state=tk.DISABLED)
+        self.result_box.pack(pady=5)
+        # Disable menu items for saving
+        self.file_menu.entryconfig('Salva risultati come CSV', state='disabled')
+        self.file_menu.entryconfig('Salva risultati temporanei', state='disabled')
 
     def ask_column_mapping_with_header(self, file):
         import pandas as pd
@@ -213,7 +261,7 @@ class PriceCompareApp:
                             if float(item_cell).is_integer():
                                 original_item = int(item_cell)
                             else:
-                                original_item = float(item_cell)
+                                original_item = int(float(item_cell))
                             item_key = str(original_item)
                         except Exception:
                             original_item = str(item_cell)
