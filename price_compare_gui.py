@@ -5,6 +5,10 @@ import json
 import os
 
 CONFIG_FILE = 'config.json'
+CSV_MENU_LABEL = 'Salva risultati come CSV'
+TEMP_MENU_LABEL = 'Salva risultati temporanei'
+LOWEST_PRICE_LABEL = 'Lowest Price'
+SOURCE_FILE_LABEL = 'Source File'
 
 class PriceCompareApp:
     def __init__(self, root):
@@ -37,8 +41,8 @@ class PriceCompareApp:
         # File menu
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label='File', menu=file_menu)
-        file_menu.add_command(label='Salva risultati come CSV', command=self.save_results, state='disabled')
-        file_menu.add_command(label='Salva risultati temporanei', command=self.save_temporary_results, state='disabled')
+        file_menu.add_command(label=CSV_MENU_LABEL, command=self.save_results, state='disabled')
+        file_menu.add_command(label=TEMP_MENU_LABEL, command=self.save_temporary_results, state='disabled')
         file_menu.add_command(label='Carica risultati da CSV', command=self.load_results_from_csv)
         file_menu.add_separator()
         file_menu.add_command(label='Esci', command=self.root.quit)
@@ -47,8 +51,8 @@ class PriceCompareApp:
         menubar.add_cascade(label='Configurazione', menu=config_menu)
         config_menu.add_command(label='Impostazioni', command=self.open_config_dialog)
         # Store menu items for enabling/disabling
-        self.menu_save_results = file_menu.entryconfig('Salva risultati come CSV', state='disabled')
-        self.menu_save_temp = file_menu.entryconfig('Salva risultati temporanei', state='disabled')
+        self.menu_save_results = file_menu.entryconfig(CSV_MENU_LABEL, state='disabled')
+        self.menu_save_temp = file_menu.entryconfig(TEMP_MENU_LABEL, state='disabled')
         frame = ttk.Frame(self.root, padding=10)
         frame.pack(fill=tk.BOTH, expand=True)
 
@@ -89,45 +93,55 @@ class PriceCompareApp:
     def select_files(self):
         files = filedialog.askopenfilenames(filetypes=[('Excel Files', '*.xlsx;*.xls')])
         if files:
-            # Only add files not already in the list
             new_files = [f for f in files if f not in self.files]
             duplicate_files = [f for f in files if f in self.files]
-            if duplicate_files:
-                messagebox.showinfo('Info', 'Listino già selezionato')
+            self._handle_duplicate_files(duplicate_files)
             if not new_files:
-                # If all selected files are duplicates, just update label and return
                 self.files_label.config(text=f'File selezionati: {len(self.files)}')
                 return
             self.files.extend(new_files)
             self.files_label.config(text=f'File selezionati: {len(self.files)}')
-            if not hasattr(self, 'file_column_mappings') or not isinstance(self.file_column_mappings, list):
-                self.file_column_mappings = []
-            for file in new_files:
-                try:
-                    item_col, price_col, description_col, header_idx = self.ask_column_mapping_with_header(file)
-                    if item_col is None or price_col is None or description_col is None:
-                        messagebox.showwarning('Warning', f'Salto file: {file}')
-                        continue
-                    self.file_column_mappings.append({
-                        'file': file,
-                        'item_col': item_col,
-                        'price_col': price_col,
-                        'description_col': description_col,
-                        'header_idx': header_idx
-                    })
-                except Exception as e:
-                    messagebox.showerror('Error', f'Impossibile leggere {file}: {e}')
-            if self.file_column_mappings:
-                self.compare_and_display()
-            else:
-                self.result_box.config(state=tk.NORMAL)
-                self.result_box.delete(1.0, tk.END)
-                self.result_box.insert(tk.END, 'Nessun file/colonna valido selezionato.')
-                self.result_box.config(state=tk.DISABLED)
-                self.file_menu.entryconfig('Salva risultati come CSV', state='disabled')
-                self.file_menu.entryconfig('Salva risultati temporanei', state='disabled')
+            self._process_new_files(new_files)
         else:
             self.files_label.config(text=f'File selezionati: {len(self.files)}')
+
+    def _handle_duplicate_files(self, duplicate_files):
+        if duplicate_files:
+            messagebox.showinfo('Info', 'Listino già selezionato')
+
+    def _process_new_files(self, new_files):
+        if not hasattr(self, 'file_column_mappings') or not isinstance(self.file_column_mappings, list):
+            self.file_column_mappings = []
+        for file in new_files:
+            self._add_file_column_mapping(file)
+        if self.file_column_mappings:
+            self.compare_and_display()
+        else:
+            self._show_no_valid_file_message()
+
+    def _add_file_column_mapping(self, file):
+        try:
+            item_col, price_col, description_col, header_idx = self.ask_column_mapping_with_header(file)
+            if item_col is None or price_col is None or description_col is None:
+                messagebox.showwarning('Warning', f'Salto file: {file}')
+                return
+            self.file_column_mappings.append({
+                'file': file,
+                'item_col': item_col,
+                'price_col': price_col,
+                'description_col': description_col,
+                'header_idx': header_idx
+            })
+        except Exception as e:
+            messagebox.showerror('Error', f'Impossibile leggere {file}: {e}')
+
+    def _show_no_valid_file_message(self):
+        self.result_box.config(state=tk.NORMAL)
+        self.result_box.delete(1.0, tk.END)
+        self.result_box.insert(tk.END, 'Nessun file/colonna valido selezionato.')
+        self.result_box.config(state=tk.DISABLED)
+        self.file_menu.entryconfig(CSV_MENU_LABEL, state='disabled')
+        self.file_menu.entryconfig(TEMP_MENU_LABEL, state='disabled')
 
     # Remove add_file method
 
@@ -155,8 +169,8 @@ class PriceCompareApp:
         self.result_box.config(state=tk.DISABLED)
         self.result_box.pack(pady=5)
         # Disable menu items for saving
-        self.file_menu.entryconfig('Salva risultati come CSV', state='disabled')
-        self.file_menu.entryconfig('Salva risultati temporanei', state='disabled')
+        self.file_menu.entryconfig(CSV_MENU_LABEL, state='disabled')
+        self.file_menu.entryconfig(TEMP_MENU_LABEL, state='disabled')
 
     def ask_column_mapping_with_header(self, file):
         import pandas as pd
@@ -292,8 +306,8 @@ class PriceCompareApp:
         if hasattr(self, 'root') and hasattr(self, 'menu_save_results') and hasattr(self, 'menu_save_temp'):
             state = 'normal' if results else 'disabled'
             # Enable menu items for saving
-            self.file_menu.entryconfig('Salva risultati come CSV', state=state)
-            self.file_menu.entryconfig('Salva risultati temporanei', state=state)
+            self.file_menu.entryconfig(CSV_MENU_LABEL, state=state)
+            self.file_menu.entryconfig(TEMP_MENU_LABEL, state=state)
 
     def display_results(self, results):
         """
@@ -331,7 +345,7 @@ class PriceCompareApp:
         # Create a frame to hold the Treeview and scrollbars
         self.result_frame = ttk.Frame(self.root)
         self.result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        columns = ['Item', 'Description', 'Lowest Price', 'Quantity', 'Source File']
+        columns = ['Item', 'Description', LOWEST_PRICE_LABEL, 'Quantity', SOURCE_FILE_LABEL]
         style = ttk.Style()
         style.configure('Treeview.Heading', background='#d9ead3', foreground='black', font=('Arial', 10, 'bold'))
         style.map('Treeview.Heading', background=[('active', '#b6d7a8')])
@@ -472,7 +486,7 @@ class PriceCompareApp:
         try:
             with open(os.path.join(folder_path, 'result_compared.csv'), 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f, delimiter=sep)
-                writer.writerow(['Item', 'Description', 'Lowest Price', 'Quantity', 'Source File'])
+                writer.writerow(['Item', 'Description', LOWEST_PRICE_LABEL, 'Quantity', SOURCE_FILE_LABEL])
                 for r in tree_data:
                     if str(r['quantity']).strip() and str(r['quantity']).strip() != '0':
                         price = r['price']
@@ -492,7 +506,7 @@ class PriceCompareApp:
             try:
                 with open(csv_path, 'w', newline='', encoding='utf-8') as f:
                     writer = csv.writer(f, delimiter=sep)
-                    writer.writerow(['Item', 'Description', 'Lowest Price', 'Quantity'])
+                    writer.writerow(['Item', 'Description', LOWEST_PRICE_LABEL, 'Quantity'])
                     for r in rows:
                         if str(r['quantity']).strip() and str(r['quantity']).strip() != '0':
                             price = r['price']
@@ -542,7 +556,7 @@ class PriceCompareApp:
         try:
             with open(file_path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f, delimiter=sep)
-                writer.writerow(['Item', 'Description', 'Lowest Price', 'Quantity', 'Source File'])
+                writer.writerow(['Item', 'Description', LOWEST_PRICE_LABEL, 'Quantity', SOURCE_FILE_LABEL])
                 for r in tree_data:
                     writer.writerow([r['item'], r['description'], r['price'], r['quantity'], r['file']])
             messagebox.showinfo('Success', f'Temporary results saved to {file_path}')
@@ -561,7 +575,7 @@ class PriceCompareApp:
         try:
             df = pd.read_csv(file_path, delimiter=sep, dtype=str)
             # Ensure columns are in the expected order and format
-            if 'Item' in df.columns and 'Description' in df.columns and 'Lowest Price' in df.columns:
+            if 'Item' in df.columns and 'Description' in df.columns and LOWEST_PRICE_LABEL in df.columns:
                 # Parse price column to string formatted according to config
                 def format_price(val):
                     if pd.isna(val) or str(val).strip() == '':
@@ -571,14 +585,14 @@ class PriceCompareApp:
                         # return f"{price_float:,.4f}".replace(',', 'X').replace('.', dec_sep).replace('X', thou_sep)
                     except Exception:
                         return str(val)
-                df['Lowest Price'] = df['Lowest Price'].apply(format_price)
+                df['Lowest Price'] = df[LOWEST_PRICE_LABEL].apply(format_price)
                 # Rename columns to match display_results expectations
                 df = df.rename(columns={
                     'Item': 'item',
                     'Description': 'description',
-                    'Lowest Price': 'price',
+                    LOWEST_PRICE_LABEL: 'price',
                     'Quantity': 'quantity',
-                    'Source File': 'file'
+                    SOURCE_FILE_LABEL: 'file'
                 })
                 # Ensure quantity is empty string if null/empty/NaN
                 import numpy as np
@@ -586,10 +600,10 @@ class PriceCompareApp:
                 self.display_results(df.to_dict('records'))
                 messagebox.showinfo('Success', f'Results loaded from {file_path}')
                 # Enable menu items for saving
-                self.file_menu.entryconfig('Salva risultati come CSV', state='normal')
-                self.file_menu.entryconfig('Salva risultati temporanei', state='normal')
+                self.file_menu.entryconfig(CSV_MENU_LABEL, state='normal')
+                self.file_menu.entryconfig(TEMP_MENU_LABEL, state='normal')
             else:
-                messagebox.showwarning('Warning', 'CSV file does not contain expected columns (Item, Description, Lowest Price).')
+                messagebox.showwarning('Warning', f'CSV file does not contain expected columns (Item, Description, {LOWEST_PRICE_LABEL}).')
         except Exception as e:
             messagebox.showerror('Error', f'Impossibile caricare i risultati da CSV: {e}')
 
